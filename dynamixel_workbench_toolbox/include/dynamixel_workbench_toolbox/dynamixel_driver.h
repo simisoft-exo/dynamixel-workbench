@@ -26,7 +26,7 @@
   #include <DynamixelSDK.h>
 #elif defined(__linux__) || defined(__APPLE__)
   #include "unistd.h"
-  #include "dynamixel_sdk/dynamixel_sdk.h"
+  #include "/home/ubuntu/wavelamp/DynamixelSDK/c++/include/dynamixel_sdk/dynamixel_sdk.h"
 #elif defined(_WIN32)
 
   #include <chrono>
@@ -88,9 +88,9 @@
 
 #endif
 
-#define MAX_DXL_SERIES_NUM  5
-#define MAX_HANDLER_NUM     5
-#define MAX_BULK_PARAMETER  20
+#define MAX_DXL_SERIES_NUM  7
+#define MAX_HANDLER_NUM     7
+#define MAX_BULK_PARAMETER  7
 
 typedef struct 
 {
@@ -144,11 +144,11 @@ class DynamixelDriver
   ~DynamixelDriver();
 
   bool init(const char* device_name = "/dev/ttyUSB0", 
-            uint32_t baud_rate = 57600, 
+            uint32_t baud_rate = 115200,
             const char **log = NULL);
 
   bool begin(const char* device_name = "/dev/ttyUSB0", 
-            uint32_t baud_rate = 57600, 
+            uint32_t baud_rate = 115200,
             const char **log = NULL);
 
   bool setPortHandler(const char *device_name, const char **log = NULL);

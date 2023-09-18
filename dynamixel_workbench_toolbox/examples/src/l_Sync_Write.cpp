@@ -20,25 +20,27 @@
 
 void swap(int32_t *array);
 
+#define SERVOS 7
 int main(int argc, char *argv[]) 
 {
   const char* port_name = "/dev/ttyUSB0";
-  int baud_rate = 57600;
+  int baud_rate = 115200;
 
-  uint16_t model_number = 0;
-  uint8_t dxl_id[2] = {0, 0};
+  int vel = 10;
+  int acc = 2;
 
-  if (argc < 5)
+  uint16_t model_number = 1200;
+  uint8_t dxl_id[SERVOS] = {0, 1, 2, 3, 4, 5, 6};
+
+  if (argc < 3)
   {
-    printf("Please set '-port_name', '-baud_rate', '-dynamixel_id_1', '-dynamixel_id_2' arguments for connected Dynamixels\n");
+    printf("Please set velocity and acceleration:");
     return 0;
   }
   else
   {
-    port_name = argv[1];
-    baud_rate = atoi(argv[2]);
-    dxl_id[0] = atoi(argv[3]);
-    dxl_id[1] = atoi(argv[4]);
+    vel = atoi(argv[1]);
+    acc = atoi(argv[2]);
   }
 
   DynamixelWorkbench dxl_wb;
@@ -57,7 +59,7 @@ int main(int argc, char *argv[])
   else
     printf("Succeed to init(%d)\n", baud_rate);  
 
-  for (int cnt = 0; cnt < 2; cnt++)
+  for (int cnt = 0; cnt < SERVOS; cnt++)
   {
     result = dxl_wb.ping(dxl_id[cnt], &model_number, &log);
     if (result == false)
@@ -71,7 +73,7 @@ int main(int argc, char *argv[])
       printf("id : %d, model_number : %d\n", dxl_id[cnt], model_number);
     }
 
-    result = dxl_wb.jointMode(dxl_id[cnt], 0, 0, &log);
+    result = dxl_wb.jointMode(dxl_id[cnt], vel, acc, &log);
     if (result == false)
     {
       printf("%s\n", log);
@@ -90,7 +92,17 @@ int main(int argc, char *argv[])
     printf("Failed to add sync write handler\n");
   }
 
-  int32_t goal_position[2] = {0, 1023};
+  result = dxl_wb.addSyncReadHandler(dxl_id[0], "Present_Position", &log);
+  if (result == false)
+  {
+    printf("%s\n", log);
+    printf("Failed to add sync read handler\n");
+  }
+
+  // int32_t goal_position[SERVOS] = {0, 0, 1023, 1023, 1023, 2047, 2047};
+  // int32_t goal_position[SERVOS] = {2047, 2047, 3072, 3072, 3072, 0, 0};
+
+  int32_t present_position[SERVOS] = {0, 0, 0, 0, 0, 0, 0};
 
   const uint8_t handler_index = 0;
   
@@ -102,18 +114,27 @@ int main(int argc, char *argv[])
       printf("%s\n", log);
       printf("Failed to sync write position\n");
     }
+        result = dxl_wb.syncRead(handler_index, &log);
+    if (result == false)
+    {
+      printf("%s\n", log);
+      printf("Failed to sync read position\n");
+    }
 
-    sleep(3);
+    result = dxl_wb.getSyncReadData(handler_index, &present_position[0], &log);
+    if (result == false)
+    {
+      printf("%s\n", log);
+    }
+    else
+    {
+      for (int cnt = 0; cnt < SERVOS; cnt++)
+        printf("[%d]G:%d P%d  ", cnt, goal_position[cnt], present_position[cnt]);
+      printf("\n");
+    }
 
-    swap(goal_position);
   }
 
   return 0;
 }
 
-void swap(int32_t *array)
-{
-  int32_t tmp = array[0];
-  array[0] = array[1];
-  array[1] = tmp;
-}
