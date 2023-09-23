@@ -30,7 +30,7 @@
 #include <signal.h>
 #include <stdarg.h>
 #include <getopt.h>
-
+#include <chrono>
 
 // LED libs
 #include "clk.h"
@@ -57,6 +57,8 @@ int clear_on_exit = 0;
 #define STRIP_TYPE              SK6812_STRIP_GRBW		// SK6812RGBW (NOT SK6812RGB)
 
 #define LED_COUNT               (LUT_W * LUT_H)
+#define FPS                     25
+#define FRAME_DURATION          (1000000/FPS)
 
 long elapsed_seconds = 0;
 long last_switch = 0;
@@ -180,12 +182,27 @@ bool initializeServos(DynamixelWorkbench &dxl_wb,
     printf("Failed to add sync write handler\n");
   }
 
-  result = dxl_wb.addSyncReadHandler(dxl_id[0], "Present_Position", &log);
-  if (!result) {
+  result = dxl_wb.initBulkRead(&log);
+  if (result == false)
+  {
     printf("%s\n", log);
-    printf("Failed to add sync read handler\n");
+  }
+  else
+  {
+    printf("Suceeded init bulk read: %s\n", log);
   }
 
+  result = dxl_wb.addBulkReadParam(dxl_id[0], "Present_Position", &log);
+  if (result == false)
+  {
+    printf("%s\n", log);
+    printf("Failed to add bulk read position param\n");
+    return false;
+  }
+  else
+  {
+    printf("Succeeded bulk read for position: %s\n", log);
+  }
   return result;
 }
 
@@ -238,7 +255,7 @@ int main(int argc, char *argv[])
     struct timeval start_time, current_time;
     gettimeofday(&start_time, NULL);
 
-    int num_frames = 50*10;
+    int num_frames = FPS*10;
     int direction = 1;
 
     AnimationContext current_animation = {
@@ -262,19 +279,6 @@ int main(int argc, char *argv[])
 
   while(running)
   {
-    result = dxl_wb.syncWrite(handler_index, &goal_position[0], &log);
-    if (result == false)
-    {
-      printf("%s\n", log);
-      printf("Failed to sync write position\n");
-    }
-
-    result = dxl_wb.syncRead(handler_index, &log);
-    if (result == false)
-    {
-      printf("%s\n", log);
-      printf("Failed to sync read position\n");
-    }
 
     // result = dxl_wb.getSyncReadData(handler_index, &present_position[0], &log);
     // if (result == false)
@@ -288,7 +292,7 @@ int main(int argc, char *argv[])
     //   printf("\n");
     // }
 
-            gettimeofday(&current_time, NULL);
+        gettimeofday(&current_time, NULL);
         elapsed_seconds = current_time.tv_sec - start_time.tv_sec;
 
         send_frame_to_neopixels(current_animation.frames[current_animation.current_frame], &ledstring);
@@ -332,8 +336,53 @@ int main(int argc, char *argv[])
           }
         }
 
-    usleep(1000000 / 50);
+  auto servo_time = std::chrono::high_resolution_clock::now();
+
+  result = dxl_wb.syncWrite(handler_index, &goal_position[0], &log);
+  if (result == false)
+  {
+    printf("%s\n", log);
+    printf("Failed to sync write position\n");
   }
+
+  auto servo_write_time = std::chrono::high_resolution_clock::now();
+
+      result = dxl_wb.bulkRead(&log);
+      if (result == false)
+      {
+        printf("%s\n", log);
+        printf("Failed to bulk read\n");
+      }
+
+      result = dxl_wb.getBulkReadData(&present_position[0], &log);
+      if (result == false)
+      {
+        printf("Failed to get bulk read data%s\n", log);
+      }
+
+  auto servo_read_time = std::chrono::high_resolution_clock::now();
+
+  // Calculate the duration for each operation
+  auto write_duration = std::chrono::duration_cast<std::chrono::microseconds>(servo_write_time - servo_time);
+  auto read_duration = std::chrono::duration_cast<std::chrono::microseconds>(servo_read_time - servo_write_time);
+
+  // Print the durations
+  // printf("syncWrite took %lld microseconds\n", write_duration.count());
+  // printf("syncRead took %lld microseconds\n", read_duration.count());
+
+  // Calculate remaining time for usleep
+  auto total_duration = write_duration + read_duration;
+  auto remaining_time = std::chrono::microseconds(FRAME_DURATION) - total_duration;
+
+  // printf("total took %lld microseconds\n", total_duration.count());
+  // printf("sleep for: %lld microseconds\n", remaining_time.count());
+
+  if (remaining_time.count() > 0)
+  {
+    usleep(remaining_time.count());
+  }
+}
+
 
   if (clear_on_exit) {
     matrix_clear();
