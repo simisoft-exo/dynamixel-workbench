@@ -74,3 +74,6 @@ target_link_libraries(find_dynamixel LINK_PUBLIC dynamixel_workbench)
 
 add_executable(monitor src/p_Monitor.cpp)
 target_link_libraries(monitor LINK_PUBLIC dynamixel_workbench)
+
+add_executable(animotion src/Animotion.cpp)
+target_link_libraries(animotion LINK_PUBLIC dynamixel_workbench)
