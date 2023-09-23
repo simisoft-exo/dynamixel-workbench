@@ -886,6 +886,90 @@ bool DynamixelWorkbench::jointMode(uint8_t id, int32_t velocity, int32_t acceler
   return result;
 }
 
+bool DynamixelWorkbench::multiJointMode(uint8_t id, int32_t velocity, int32_t acceleration, const char **log)
+{
+  bool result = false;
+
+  model_name = getModelName(id, log);
+  if (model_name == NULL) return false;
+
+  result = torqueOff(id, log);
+  if (result == false) return false;
+
+  result = setExtendedPositionControlMode(id, log);
+  if (result == false) return false;
+
+  if (getProtocolVersion() == 1.0)
+  {
+    if (!strncmp(model_name, "MX-28-2", strlen("MX-28-2"))   ||
+        !strncmp(model_name, "MX-64-2", strlen("MX-64-2"))   ||
+        !strncmp(model_name, "MX-106-2", strlen("MX-106-2")) ||
+        !strncmp(model_name, "XL330", strlen("XL330"))       ||
+        !strncmp(model_name, "XC330", strlen("XC330"))       ||
+        !strncmp(model_name, "XL430", strlen("XL430"))       ||
+        !strncmp(model_name, "XC430", strlen("XC430"))       ||
+        !strncmp(model_name, "XM", strlen("XM"))             ||
+        !strncmp(model_name, "XH", strlen("XH"))             ||
+        !strncmp(model_name, "XW", strlen("XW")))
+    {
+      result = writeRegister(id, "Profile_Acceleration", acceleration, log);
+      result = writeRegister(id, "Profile_Velocity", velocity, log);
+    }
+    else if (!strncmp(model_name, "MX-28", strlen("MX-28"))   ||
+             !strncmp(model_name, "MX-64", strlen("MX-64"))   ||
+             !strncmp(model_name, "MX-106", strlen("MX-106")))
+    {
+      result = writeRegister(id, "Moving_Speed", velocity, log);
+      result = writeRegister(id, "Goal_Acceleration", acceleration, log);
+    }
+    else
+    {
+      result = writeRegister(id, "Moving_Speed", velocity, log);
+    }
+  }
+  else if (getProtocolVersion() == 2.0)
+  {
+    if (!strncmp(model_name, "XL-320", strlen("XL-320")))
+    {
+      result = writeRegister(id, "Moving_Speed", velocity, log);
+    }
+    else if (!strncmp(model_name, "PRO-M42-10-S260-R-A",  strlen("PRO-M42-10-S260-R-A"))  ||
+             !strncmp(model_name, "PRO-M54-40-S250-R-A",  strlen("PRO-M54-40-S250-R-A"))  ||
+             !strncmp(model_name, "PRO-M54-60-S250-R-A",  strlen("PRO-M54-60-S250-R-A"))  ||
+             !strncmp(model_name, "PRO-H42-20-S300-R-A",  strlen("PRO-H42-20-S300-R-A"))  ||
+             !strncmp(model_name, "PRO-H54-100-S500-R-A", strlen("PRO-H54-100-S500-R-A")) ||
+             !strncmp(model_name, "PRO-H54-200-S500-R-A", strlen("PRO-H54-200-S500-R-A")) ||
+             !strncmp(model_name, "PRO-PLUS", strlen("PRO-PLUS")))
+    {
+      result = writeRegister(id, "Profile_Acceleration", acceleration, log);
+      result = writeRegister(id, "Profile_Velocity", velocity, log);
+    }
+    else if (!strncmp(model_name, "PRO-L", strlen("PRO-L")) ||
+             !strncmp(model_name, "PRO-M", strlen("PRO-M")) ||
+             !strncmp(model_name, "PRO-H", strlen("PRO-H")))
+    {
+      result = writeRegister(id, "Goal_Velocity", velocity, log);
+      result = writeRegister(id, "Goal_Acceleration", acceleration, log);
+    }
+    else
+    {
+      result = writeRegister(id, "Profile_Acceleration", acceleration, log);
+      result = writeRegister(id, "Profile_Velocity", velocity, log);
+    }
+  }
+
+  if (result == false)
+  {
+    if (log != NULL) *log = "[DynamixelWorkbench] Failed to set Joint Mode!";
+    return false;
+  }
+
+  result = torqueOn(id, log);
+  if (result == false) return false;
+
+  if (log != NULL) *log = "[DynamixelWorkbench] Succeeded to set Joint Mode!";
+  return result;
+}
 bool DynamixelWorkbench::wheelMode(uint8_t id, int32_t acceleration, const char **log)
 {
   bool result = false;

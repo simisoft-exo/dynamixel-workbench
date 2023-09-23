@@ -60,7 +60,7 @@ class DynamixelWorkbench : public DynamixelDriver
   bool setPWMControlMode(uint8_t id, const char **log = NULL);
 
   bool setOperatingMode(uint8_t id, uint8_t index, const char **log = NULL);
-
+  bool multiJointMode(uint8_t id, int32_t velocity, int32_t acceleration, const char **log = NULL);
   bool jointMode(uint8_t id, int32_t velocity = 0, int32_t acceleration = 0, const char **log = NULL);
   bool wheelMode(uint8_t id, int32_t acceleration = 0, const char **log = NULL);
   bool currentBasedPositionMode(uint8_t id, int32_t current = 0, const char **log = NULL);

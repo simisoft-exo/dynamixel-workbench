@@ -5,20 +5,27 @@ add_compile_options(-std=c++14)
 
 include_directories(
   ../src
+  ../../rpi_ws281x
 )
 
-add_library(dynamixel_workbench
+add_subdirectory(../../rpi_ws281x rpi_ws281x_build)
+
+add_library(
+  dynamixel_workbench
   ../src/dynamixel_workbench_toolbox/dynamixel_item.cpp
   ../src/dynamixel_workbench_toolbox/dynamixel_driver.cpp
   ../src/dynamixel_workbench_toolbox/dynamixel_tool.cpp
   ../src/dynamixel_workbench_toolbox/dynamixel_workbench.cpp
 )
 
+
 if(APPLE)
   target_link_libraries(dynamixel_workbench LINK_PUBLIC "/usr/local/lib/libdxl_mac_cpp.dylib")
 else()
   target_link_libraries(dynamixel_workbench LINK_PUBLIC "/usr/local/lib/libdxl_x86_cpp.so")
 endif()
+
+target_link_libraries(dynamixel_workbench LINK_PUBLIC ws2811)  # link ws2811 to it
 
 add_executable(model_scan src/a_Model_Scan.cpp)
 target_link_libraries(model_scan LINK_PUBLIC dynamixel_workbench)

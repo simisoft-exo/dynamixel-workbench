@@ -17,6 +17,7 @@
 /* Authors: Taehun Lim (Darby) */
 
 #include <DynamixelWorkbench.h>
+#include "ws2811.h"
 
 void swap(int32_t *array);
 
@@ -73,15 +74,15 @@ int main(int argc, char *argv[])
       printf("id : %d, model_number : %d\n", dxl_id[cnt], model_number);
     }
 
-    result = dxl_wb.jointMode(dxl_id[cnt], vel, acc, &log);
+    result = dxl_wb.multiJointMode(dxl_id[cnt], vel, acc, &log);
     if (result == false)
     {
       printf("%s\n", log);
-      printf("Failed to change joint mode\n");
+      printf("Failed to change to multi joint mode\n");
     }
     else
     {
-      printf("Succeed to change joint mode\n");
+      printf("Succeed to change to multi joint mode\n");
     }
   }
 
@@ -99,7 +100,7 @@ int main(int argc, char *argv[])
     printf("Failed to add sync read handler\n");
   }
 
-  // int32_t goal_position[SERVOS] = {0, 0, 1023, 1023, 1023, 2047, 2047};
+  int32_t goal_position[SERVOS] = {0, -30000, -1023, -1023*10, 2048*10, 2047, 2047};
   // int32_t goal_position[SERVOS] = {2047, 2047, 3072, 3072, 3072, 0, 0};
 
   int32_t present_position[SERVOS] = {0, 0, 0, 0, 0, 0, 0};
