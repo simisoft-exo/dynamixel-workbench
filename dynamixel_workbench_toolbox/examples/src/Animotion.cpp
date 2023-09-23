@@ -309,19 +309,6 @@ int main(int argc, char *argv[])
 
   while(running)
   {
-
-    // result = dxl_wb.getSyncReadData(handler_index, &present_position[0], &log);
-    // if (result == false)
-    // {
-    //   printf("%s\n", log);
-    // }
-    // else
-    // {
-    //   for (int cnt = 0; cnt < SERVOS; cnt++)
-    //     printf("[%d]G:%d P%d  ", cnt, goal_position[cnt], present_position[cnt]);
-    //   printf("\n");
-    // }
-
         gettimeofday(&current_time, NULL);
         elapsed_seconds = current_time.tv_sec - start_time.tv_sec;
 
@@ -343,16 +330,14 @@ int main(int argc, char *argv[])
           last_switch = elapsed_seconds;
           printf("5 seconds: current- %d  next- %d\n", current_animation_type, next_animation_type);
 
-        // Clear or initialize current_animation before running these functions
         // Optionally use smooth transition functions here
 
-          if (next_animation_type != current_animation_type) {
-            clear_animation(&current_animation);
-            switch (next_animation_type) {
-                case GROWING_ELLIPSE:
-                    make_growing_ellipse(&current_animation, num_frames);
-                    next_animation_type = ROTATING_FRAMES;
-                    break;
+     clear_animation(&current_animation);
+     switch (next_animation_type) {
+         case GROWING_ELLIPSE:
+             make_growing_ellipse(&current_animation, num_frames);
+             next_animation_type = ROTATING_FRAMES;
+             break;
 
                 case ROTATING_FRAMES:
                     make_rotating_frames(&current_animation, num_frames);
@@ -363,7 +348,6 @@ int main(int argc, char *argv[])
                     break;
             }
             current_animation_type = next_animation_type;  // Update the current animation type
-          }
         }
 
   auto servo_time = std::chrono::high_resolution_clock::now();
