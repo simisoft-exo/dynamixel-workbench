@@ -136,6 +136,36 @@ bool initializeLEDs()
   return true;
 }
 
+bool bulkReadPosition(DynamixelWorkbench &dxl_wb, int32_t *present_position, const char **log)
+{
+  bool result = dxl_wb.bulkRead(log);
+  if (result == false)
+  {
+    printf("%s\n", *log);
+    printf("Failed to bulk read\n");
+    return false;
+  }
+
+  result = dxl_wb.getBulkReadData(&present_position[0], log);
+  if (result == false)
+  {
+    printf("Failed to get bulk read data%s\n", *log);
+    return false;
+  }
+  return true;
+}
+
+bool syncWritePosition(DynamixelWorkbench &dxl_wb, uint8_t handler_index, int32_t *goal_position, const char **log)
+{
+  bool result = dxl_wb.syncWrite(handler_index, &goal_position[0], log);
+  if (result == false)
+  {
+    printf("%s\n", *log);
+    printf("Failed to sync write position\n");
+  }
+  return result;
+}
+
 bool initializeServos(DynamixelWorkbench &dxl_wb,
                    const char *port_name,
                    uint32_t baud_rate,
@@ -338,27 +368,11 @@ int main(int argc, char *argv[])
 
   auto servo_time = std::chrono::high_resolution_clock::now();
 
-  result = dxl_wb.syncWrite(handler_index, &goal_position[0], &log);
-  if (result == false)
-  {
-    printf("%s\n", log);
-    printf("Failed to sync write position\n");
-  }
+  syncWritePosition(dxl_wb, handler_index, &goal_position[0], &log);
 
   auto servo_write_time = std::chrono::high_resolution_clock::now();
 
-      result = dxl_wb.bulkRead(&log);
-      if (result == false)
-      {
-        printf("%s\n", log);
-        printf("Failed to bulk read\n");
-      }
-
-      result = dxl_wb.getBulkReadData(&present_position[0], &log);
-      if (result == false)
-      {
-        printf("Failed to get bulk read data%s\n", log);
-      }
+  bulkReadPosition(dxl_wb, present_position, &log);
 
   auto servo_read_time = std::chrono::high_resolution_clock::now();
 
