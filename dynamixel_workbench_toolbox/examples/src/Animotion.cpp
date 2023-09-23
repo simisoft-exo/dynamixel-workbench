@@ -66,7 +66,7 @@ int clear_on_exit = 0;
 
 long elapsed_seconds = 0;
 long last_switch = 0;
-int switch_interval = 5;  // Switch every 5 seconds
+int switch_interval = 20;  // Switch every 5 seconds
 
 ws2811_t ledstring =
 {
@@ -245,7 +245,6 @@ bool checkIfPositionsReached(const int32_t goal_position[], const int32_t presen
   for (size_t i = 0; i < size; ++i)
   {
     long delta = std::abs(goal_position[i] - present_position[i]);
-    printf("possition diff: %ld", delta);
     if (std::abs(goal_position[i] - present_position[i]) > 15)
     {
       return false;
@@ -254,18 +253,25 @@ bool checkIfPositionsReached(const int32_t goal_position[], const int32_t presen
   return true;
 }
 
+enum class TransitionState {
+  NONE,
+  TRANSITIONING
+};
+
 class AnimationPlayer {
   private:
     std::unordered_map<AnimationType, AnimationContext> animations;
     AnimationContext *current_animation;
+    AnimationContext *transition_animation = nullptr;
+    AnimationContext *next_animation;
     std::vector<AnimationType> animation_sequence;
     size_t current_animation_index;
-
+    int num_frames = FPS*10;
+    TransitionState transition_state = TransitionState::NONE;
   public:
     // Constructor
     AnimationPlayer() {
 
-    int num_frames = FPS*10;
         // Create all the animations
     AnimationContext rotating_frames = {
       .frames = NULL,
@@ -294,27 +300,53 @@ class AnimationPlayer {
     current_animation = &animations[animation_sequence[current_animation_index]];
     }
 
-    // Method to switch to another animation
-    void clearAndSwitch(AnimationType new_animation) {
-        if (animations.find(new_animation) != animations.end()) {
-            clear_animation(current_animation);
-            current_animation = &animations[new_animation];
-        } else {
-          printf("Animation not changing");
-            // Handle error: Animation type not found
-        }
-    }
-
     void nextAnimation() {
         // Increment the index and wrap around if necessary
         current_animation_index = (current_animation_index + 1) % animation_sequence.size();
 
         // Switch to the next animation
-        current_animation = &animations[animation_sequence[current_animation_index]];
+        next_animation = &animations[animation_sequence[current_animation_index]];
+        if (transition_animation == nullptr) {
+            transition_animation = new AnimationContext;  // or however you create a new AnimationContext
+            transition_animation->frames = NULL;
+            transition_animation->frame_count = 0;
+            transition_animation->current_frame = 0;
+            transition_animation->direction = 1;
+        } else {
+          for (int i = 0; i < transition_animation->frame_count; ++i) {
+            if (transition_animation->frames[i] != NULL) {
+              cairo_surface_destroy(transition_animation->frames[i]);  // Replace with your specific deallocation function
+            }
+          }
+          free(transition_animation->frames);  // Use free() since realloc was used for allocation
+          transition_animation = nullptr;
+          transition_animation = new AnimationContext;  // or however you create a new AnimationContext
+          transition_animation->frames = NULL;
+          transition_animation->frame_count = 0;
+          transition_animation->current_frame = 0;
+          transition_animation->direction = 1;
+        }
+
+        smooth_interpolate_to_new_frames(current_animation, next_animation, transition_animation, 2*FPS);
+        current_animation = next_animation;
+        transition_state = TransitionState::TRANSITIONING;
     }
 
     void play () {
-        // Your send_frame_to_neopixels function
+      if (transition_state == TransitionState::TRANSITIONING){
+
+        int frame_no = transition_animation->current_frame;
+
+        transition_animation->current_frame++;
+        if (transition_animation->current_frame >= transition_animation->frame_count - 1) {
+          transition_state = TransitionState::NONE;
+        } else {
+          send_frame_to_neopixels(transition_animation->frames[transition_animation->current_frame], &ledstring);
+        }
+      }
+      else
+      {
+        // Send current animation
         send_frame_to_neopixels(current_animation->frames[current_animation->current_frame], &ledstring);
 
         current_animation->current_frame += current_animation->direction;
@@ -322,19 +354,12 @@ class AnimationPlayer {
         if (current_animation->current_frame >= current_animation->frame_count - 1 || current_animation->current_frame <= 0) {
           current_animation->direction *= -1;  // Reverse direction
         }
+      }
 
-        ws2811_return_t ret;
-        if ((ret = ws2811_render(&ledstring)) != WS2811_SUCCESS)
-        {
-            fprintf(stderr, "ws2811_render failed: %s\n", ws2811_get_return_t_str(ret));
-            return; // Return or break based on your design
-        }
     }
 };
 
-
-int main(int argc, char *argv[]) 
-
+int main(int argc, char *argv[])
 {
   const char* port_name = "/dev/ttyUSB0";
   int baud_rate = 115200;
@@ -371,8 +396,8 @@ int main(int argc, char *argv[])
 
   const uint8_t handler_index = 0;
   // SERVOS
-  int32_t positions2[SERVOS] = {1000, -30000, -21023, -10230, 20480, 12047, 32047};
-  int32_t positions1[SERVOS] = {-32047, -12047, -20480, 10230, 21023, 30000, -1000};
+  int32_t positions1[SERVOS] = {1000, -30000, -21023, -10230, 20480, 12047, 32047};
+  int32_t positions2[SERVOS] = {-32047, -12047, -20480, 10230, 21023, 30000, -1000};
 
   int32_t goal_positions[SERVOS];
   std::copy(std::begin(positions1), std::end(positions1), std::begin(goal_positions));
@@ -401,7 +426,7 @@ int main(int argc, char *argv[])
           last_switch = elapsed_seconds;
           anim->nextAnimation();
         }
-          anim->play();
+        anim->play();
 
      auto servo_time = std::chrono::high_resolution_clock::now();
 
@@ -457,4 +482,3 @@ int main(int argc, char *argv[])
 
   return 0;
 }
-
