@@ -31,6 +31,8 @@
 #include <stdarg.h>
 #include <getopt.h>
 #include <chrono>
+#include <cmath> // for std::abs
+#include <algorithm> // for std::reverse
 
 // LED libs
 #include "clk.h"
@@ -43,11 +45,12 @@
 
 #include <time.h>
 #include <sys/time.h>
+#include <unordered_map>
 
-void swap(int32_t *array);
 static uint8_t running = 1;
 int clear_on_exit = 0;
 
+#define SERVOS                  7
 // defaults for cmdline options
 #define TARGET_FREQ             WS2811_TARGET_FREQ
 #define GPIO_PIN                18
@@ -59,6 +62,7 @@ int clear_on_exit = 0;
 #define LED_COUNT               (LUT_W * LUT_H)
 #define FPS                     25
 #define FRAME_DURATION          (1000000/FPS)
+
 
 long elapsed_seconds = 0;
 long last_switch = 0;
@@ -171,8 +175,7 @@ bool initializeServos(DynamixelWorkbench &dxl_wb,
                    uint32_t baud_rate,
                    uint8_t *dxl_id,
                    int vel,
-                   int acc,
-                   int SERVOS) {
+                   int acc) {
   const char *log;
   bool result;
   uint16_t model_number;
@@ -236,7 +239,100 @@ bool initializeServos(DynamixelWorkbench &dxl_wb,
   return result;
 }
 
-#define SERVOS 7
+
+bool checkIfPositionsReached(const int32_t goal_position[], const int32_t present_position[], size_t size)
+{
+  for (size_t i = 0; i < size; ++i)
+  {
+    long delta = std::abs(goal_position[i] - present_position[i]);
+    printf("possition diff: %ld", delta);
+    if (std::abs(goal_position[i] - present_position[i]) > 15)
+    {
+      return false;
+    }
+  }
+  return true;
+}
+
+class AnimationPlayer {
+  private:
+    std::unordered_map<AnimationType, AnimationContext> animations;
+    AnimationContext *current_animation;
+    std::vector<AnimationType> animation_sequence;
+    size_t current_animation_index;
+
+  public:
+    // Constructor
+    AnimationPlayer() {
+
+    int num_frames = FPS*10;
+        // Create all the animations
+    AnimationContext rotating_frames = {
+      .frames = NULL,
+      .frame_count = 0,
+      .current_frame = 0,
+      .direction = 1
+    };
+
+    make_rotating_frames(&rotating_frames,num_frames);
+    animations[AnimationType::ROTATING_FRAMES] = rotating_frames;
+
+    AnimationContext growing_ellipse_frames = {
+      .frames = NULL,
+      .frame_count = 0,
+      .current_frame = 0,
+      .direction = 1
+    };
+
+    make_growing_ellipse(&growing_ellipse_frames,num_frames);
+    animations[AnimationType::GROWING_ELLIPSE] = growing_ellipse_frames;
+
+    animation_sequence.push_back(AnimationType::ROTATING_FRAMES);
+    animation_sequence.push_back(AnimationType::GROWING_ELLIPSE);
+
+        // Initialize current and next animations
+    current_animation = &animations[animation_sequence[current_animation_index]];
+    }
+
+    // Method to switch to another animation
+    void clearAndSwitch(AnimationType new_animation) {
+        if (animations.find(new_animation) != animations.end()) {
+            clear_animation(current_animation);
+            current_animation = &animations[new_animation];
+        } else {
+          printf("Animation not changing");
+            // Handle error: Animation type not found
+        }
+    }
+
+    void nextAnimation() {
+        // Increment the index and wrap around if necessary
+        current_animation_index = (current_animation_index + 1) % animation_sequence.size();
+
+        // Switch to the next animation
+        current_animation = &animations[animation_sequence[current_animation_index]];
+    }
+
+    void play () {
+        // Your send_frame_to_neopixels function
+        send_frame_to_neopixels(current_animation->frames[current_animation->current_frame], &ledstring);
+
+        current_animation->current_frame += current_animation->direction;
+        /* printf("moved to frame: %d", current_animation.current_frame); */
+        if (current_animation->current_frame >= current_animation->frame_count - 1 || current_animation->current_frame <= 0) {
+          current_animation->direction *= -1;  // Reverse direction
+        }
+
+        ws2811_return_t ret;
+        if ((ret = ws2811_render(&ledstring)) != WS2811_SUCCESS)
+        {
+            fprintf(stderr, "ws2811_render failed: %s\n", ws2811_get_return_t_str(ret));
+            return; // Return or break based on your design
+        }
+    }
+};
+
+
 int main(int argc, char *argv[]) 
 
 {
@@ -261,124 +357,93 @@ int main(int argc, char *argv[])
   }
 
   DynamixelWorkbench dxl_wb;
+  AnimationPlayer *anim = new AnimationPlayer();
 
   const char *log;
   bool result = false;
 
-  if (!initializeServos(dxl_wb, port_name, baud_rate, dxl_id, vel, acc, SERVOS)) {
+  if (!initializeServos(dxl_wb, port_name, baud_rate, dxl_id, vel, acc)) {
     printf("Failed to initialized some or all settings");
     return 0;  // Exit if the initialization failed
   }
 
   initializeLEDs();
 
+  const uint8_t handler_index = 0;
   // SERVOS
-  int32_t goal_position[SERVOS] = {0, -30000, -1023, -1023*10, 2048*10, 2047, 2047};
-  // int32_t goal_position[SERVOS] = {2047, 2047, 3072, 3072, 3072, 0, 0};
+  int32_t positions2[SERVOS] = {1000, -30000, -21023, -10230, 20480, 12047, 32047};
+  int32_t positions1[SERVOS] = {-32047, -12047, -20480, 10230, 21023, 30000, -1000};
+
+  int32_t goal_positions[SERVOS];
+  std::copy(std::begin(positions1), std::end(positions1), std::begin(goal_positions));
+
+  int current_goal_pos = 1;
+  syncWritePosition(dxl_wb, handler_index, &goal_positions[0], &log);
+
+  anim->play();
 
   int32_t present_position[SERVOS] = {0, 0, 0, 0, 0, 0, 0};
 
-  const uint8_t handler_index = 0;
 
   //LEDS
     ws2811_return_t ret;
     struct timeval start_time, current_time;
     gettimeofday(&start_time, NULL);
 
-    int num_frames = FPS*10;
-    int direction = 1;
-
-    AnimationContext current_animation = {
-      .frames = NULL,
-      .frame_count = 0,
-      .current_frame = 0,
-      .direction = 1
-    };
-
-    AnimationContext next_animation = {
-      .frames = NULL,
-      .frame_count = 0,
-      .current_frame = 0,
-      .direction = 1
-    };
-
-    enum AnimationType current_animation_type = GROWING_ELLIPSE;
-    enum AnimationType next_animation_type = ROTATING_FRAMES;  // Start with this animation
-
-    make_growing_ellipse(&current_animation, num_frames);
 
   while(running)
   {
         gettimeofday(&current_time, NULL);
         elapsed_seconds = current_time.tv_sec - start_time.tv_sec;
 
-        send_frame_to_neopixels(current_animation.frames[current_animation.current_frame], &ledstring);
-        if ((ret = ws2811_render(&ledstring)) != WS2811_SUCCESS)
-        {
-            fprintf(stderr, "ws2811_render failed: %s\n", ws2811_get_return_t_str(ret));
-            break;
-        }
-
-        current_animation.current_frame += current_animation.direction;
-        /* printf("moved to frame: %d", current_animation.current_frame); */
-        if (current_animation.current_frame >= current_animation.frame_count - 1 || current_animation.current_frame <= 0) {
-          current_animation.direction *= -1;  // Reverse direction
-        }
-
         // Check if 5 seconds have passed
         if (elapsed_seconds - last_switch >= switch_interval) {
           last_switch = elapsed_seconds;
-          printf("5 seconds: current- %d  next- %d\n", current_animation_type, next_animation_type);
-
-        // Optionally use smooth transition functions here
-
-     clear_animation(&current_animation);
-     switch (next_animation_type) {
-         case GROWING_ELLIPSE:
-             make_growing_ellipse(&current_animation, num_frames);
-             next_animation_type = ROTATING_FRAMES;
-             break;
-
-                case ROTATING_FRAMES:
-                    make_rotating_frames(&current_animation, num_frames);
-                    next_animation_type = GROWING_ELLIPSE;
-                    break;
-
-                default:
-                    break;
-            }
-            current_animation_type = next_animation_type;  // Update the current animation type
+          anim->nextAnimation();
         }
+          anim->play();
 
-  auto servo_time = std::chrono::high_resolution_clock::now();
+     auto servo_time = std::chrono::high_resolution_clock::now();
 
-  syncWritePosition(dxl_wb, handler_index, &goal_position[0], &log);
 
-  auto servo_write_time = std::chrono::high_resolution_clock::now();
+     if (checkIfPositionsReached(goal_positions, present_position, SERVOS))
+     {
+       if (current_goal_pos = 1){
+         std::copy(std::begin(positions1), std::end(positions1), std::begin(goal_positions));
+         current_goal_pos = 2;
+       }
+       if (current_goal_pos = 2){
+         std::copy(std::begin(positions2), std::end(positions2), std::begin(goal_positions));
+         current_goal_pos = 1;
+       }
+       syncWritePosition(dxl_wb, handler_index, &goal_positions[0], &log);
+     }
 
-  bulkReadPosition(dxl_wb, present_position, &log);
+     auto servo_write_time = std::chrono::high_resolution_clock::now();
 
-  auto servo_read_time = std::chrono::high_resolution_clock::now();
+     bulkReadPosition(dxl_wb, present_position, &log);
 
-  // Calculate the duration for each operation
-  auto write_duration = std::chrono::duration_cast<std::chrono::microseconds>(servo_write_time - servo_time);
-  auto read_duration = std::chrono::duration_cast<std::chrono::microseconds>(servo_read_time - servo_write_time);
+     auto servo_read_time = std::chrono::high_resolution_clock::now();
 
-  // Print the durations
-  // printf("syncWrite took %lld microseconds\n", write_duration.count());
-  // printf("syncRead took %lld microseconds\n", read_duration.count());
+     // Calculate the duration for each operation
+     auto write_duration = std::chrono::duration_cast<std::chrono::microseconds>(servo_write_time - servo_time);
+     auto read_duration = std::chrono::duration_cast<std::chrono::microseconds>(servo_read_time - servo_write_time);
 
-  // Calculate remaining time for usleep
-  auto total_duration = write_duration + read_duration;
-  auto remaining_time = std::chrono::microseconds(FRAME_DURATION) - total_duration;
+     // Print the durations
+     // printf("syncWrite took %lld microseconds\n", write_duration.count());
+     // printf("syncRead took %lld microseconds\n", read_duration.count());
 
-  // printf("total took %lld microseconds\n", total_duration.count());
-  // printf("sleep for: %lld microseconds\n", remaining_time.count());
+     // Calculate remaining time for usleep
+     auto total_duration = write_duration + read_duration;
+     auto remaining_time = std::chrono::microseconds(FRAME_DURATION) - total_duration;
 
-  if (remaining_time.count() > 0)
-  {
-    usleep(remaining_time.count());
-  }
+     // printf("total took %lld microseconds\n", total_duration.count());
+     // printf("sleep for: %lld microseconds\n", remaining_time.count());
+
+     if (remaining_time.count() > 0)
+     {
+       usleep(remaining_time.count());
+     }
 }
 
 
