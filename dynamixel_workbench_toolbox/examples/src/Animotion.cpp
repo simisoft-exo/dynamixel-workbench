@@ -384,6 +384,74 @@ class AnimationPlayer {
     }
 };
 
+
+class ServoPlayer {
+private:
+    const char *port_name;
+    int baud_rate;
+    int vel, acc;
+    uint16_t model_number;
+    uint8_t dxl_id[SERVOS];
+    DynamixelWorkbench dxl_wb;
+    int32_t positions1[SERVOS];
+    int32_t positions2[SERVOS];
+    int32_t goal_positions[SERVOS];
+    int32_t present_positions[SERVOS];
+    int current_goal_pos;
+
+public:
+    ServoPlayer(int velocity, int acceleration)
+      : port_name("/dev/ttyUSB0"), baud_rate(3000000),
+        vel(velocity), acc(acceleration), model_number(1200), current_goal_pos(2) {
+
+        dxl_id[0] = 0; dxl_id[1] = 1; dxl_id[2] = 2; dxl_id[3] = 3;
+        dxl_id[4] = 4; dxl_id[5] = 5; dxl_id[6] = 6;
+
+        positions1[0] = 100000; positions1[1] = -300000; positions1[2] = -210230;
+        positions1[3] = -102300; positions1[4] = 204800; positions1[5] = 120470; positions1[6] = 32047;
+
+        positions2[0] = -320470; positions2[1] = -120470; positions2[2] = -204800;
+        positions2[3] = 102300; positions2[4] = 210230; positions2[5] = 300000; positions2[6] = -10000;
+
+        for (int i = 0; i < SERVOS; ++i) {
+            present_positions[i] = 0;
+        }
+
+        const char *log;
+        if (!initializeServos()) {
+            printf("Failed to initialized some or all settings");
+            exit(0);  // Exit if the initialization failed
+        }
+    }
+
+    bool initializeServos() {
+        const char *log;
+        return ::initializeServos(dxl_wb, port_name, baud_rate, dxl_id, vel, acc);
+    }
+
+    void updateGoalPositions() {
+      const char *log;
+      const uint8_t handler_index = 0;
+      syncWritePosition(dxl_wb, handler_index, &goal_positions[0], &log);
+        bool reached = checkIfPositionsReached(goal_positions, present_positions, SERVOS);
+        if (reached) {
+            if (current_goal_pos == 1) {
+                std::copy(std::begin(positions2), std::end(positions2), std::begin(goal_positions));
+                current_goal_pos = 2;
+            } else if (current_goal_pos == 2) {
+                std::copy(std::begin(positions1), std::end(positions1), std::begin(goal_positions));
+                current_goal_pos = 1;
+            }
+        }
+    }
+
+    void bulkReadPositions() {
+        const char *log;
+        bulkReadPosition(dxl_wb, present_positions, &log);
+    }
+
+};
+
 int main(int argc, char *argv[])
 {
   const char* port_name = "/dev/ttyUSB0";
@@ -406,39 +474,14 @@ int main(int argc, char *argv[])
     acc = atoi(argv[2]);
   }
 
-  DynamixelWorkbench dxl_wb;
+  ServoPlayer servoPlayer(vel, acc);
   AnimationPlayer *anim = new AnimationPlayer();
-
-  const char *log;
-  bool result = false;
-
-  if (!initializeServos(dxl_wb, port_name, baud_rate, dxl_id, vel, acc)) {
-    printf("Failed to initialized some or all settings");
-    return 0;  // Exit if the initialization failed
-  }
-
-
-  const uint8_t handler_index = 0;
-  // SERVOS
-  int32_t positions1[SERVOS] = {100000, -300000, -210230, -102300, 204800, 120470, 32047};
-  int32_t positions2[SERVOS] = {-320470, -120470, -204800, 102300, 210230, 300000, -10000};
-
-  int32_t goal_positions[SERVOS];
-  std::copy(std::begin(positions1), std::end(positions2), std::begin(goal_positions));
-
-  int current_goal_pos = 2;
-  syncWritePosition(dxl_wb, handler_index, &goal_positions[0], &log);
 
   anim->play();
 
-  int32_t present_position[SERVOS] = {0, 0, 0, 0, 0, 0, 0};
-
-
   //LEDS
-    ws2811_return_t ret;
-    struct timeval start_time, current_time;
-    gettimeofday(&start_time, NULL);
-
+  struct timeval start_time, current_time;
+  gettimeofday(&start_time, NULL);
 
   while(running)
   {
@@ -452,25 +495,9 @@ int main(int argc, char *argv[])
      anim->play();
 
      auto servo_time = std::chrono::high_resolution_clock::now();
-
-     bool reached = checkIfPositionsReached(goal_positions, present_position, SERVOS);
-     if (reached)
-     {
-       if (current_goal_pos = 1){
-         std::copy(std::begin(positions2), std::end(positions2), std::begin(goal_positions));
-         current_goal_pos = 2;
-       }
-       if (current_goal_pos = 2){
-         std::copy(std::begin(positions1), std::end(positions1), std::begin(goal_positions));
-         current_goal_pos = 1;
-       }
-       syncWritePosition(dxl_wb, handler_index, &goal_positions[0], &log);
-     }
-
+     servoPlayer.updateGoalPositions();
      auto servo_write_time = std::chrono::high_resolution_clock::now();
-
-     bulkReadPosition(dxl_wb, present_position, &log);
-
+     servoPlayer.bulkReadPositions();
      auto servo_read_time = std::chrono::high_resolution_clock::now();
 
      // Calculate the duration for each operation
