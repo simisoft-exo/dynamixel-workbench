@@ -149,12 +149,14 @@ enum class TransitionState {
 class AnimationPlayer {
   private:
     std::unordered_map<AnimationType, AnimationContext> animations;
-    AnimationContext *current_animation;
-    AnimationContext *transition_animation = nullptr;
-    AnimationContext *next_animation;
     std::vector<AnimationType> animation_sequence;
     size_t current_animation_index;
+
     int num_frames = FPS*10;
+
+    AnimationContext *current_animation;
+    AnimationContext *next_animation;
+    AnimationContext *transition_animation = nullptr;
     TransitionState transition_state = TransitionState::NONE;
   public:
     // Constructor
@@ -279,11 +281,11 @@ private:
     uint16_t model_number;
     uint8_t dxl_id[SERVOS];
     DynamixelWorkbench dxl_wb;
-    int32_t positions1[SERVOS];
-    int32_t positions2[SERVOS];
     int32_t goal_positions[SERVOS];
     int32_t present_positions[SERVOS];
+    const int handler_index;
     int current_goal_pos;
+    std::vector<std::vector<int32_t>> listOfGoalPositions;
 
     bool bulkReadPosition(DynamixelWorkbench &dxl_wb, int32_t *present_position, const char **log)
     {
@@ -304,8 +306,8 @@ private:
         return true;
       }
 
-      bool syncWritePosition(DynamixelWorkbench &dxl_wb, uint8_t handler_index, int32_t *goal_position, const char **log)
-      {
+    bool syncWritePosition(DynamixelWorkbench &dxl_wb, uint8_t handler_index, int32_t *goal_position, const char **log)
+    {
         bool result = dxl_wb.syncWrite(handler_index, &goal_position[0], log);
         if (result == false)
         {
@@ -315,23 +317,21 @@ private:
         return result;
       }
       
-      bool checkIfPositionsReached(const int32_t goal_position[], const int32_t present_position[], size_t size)
-      {
+    bool checkIfPositionsReached()
+    {
         bool reached = true;
-        for (size_t i = 0; i < size; ++i)
+        for (size_t i = 0; i < SERVOS; ++i)
         {
-          long delta = std::abs(goal_position[i] - present_position[i]);
-          printf("id: %d delta: %ld | ", i, delta);
+          long delta = std::abs(goal_positions[i] - present_positions[i]);
           if (delta > 30)
           {
             reached = false;
           }
         }
-        printf("\n");
         return reached;
       }
 
-      bool initializeWorkbench(DynamixelWorkbench &dxl_wb,
+    bool initializeWorkbench(DynamixelWorkbench &dxl_wb,
                    const char *port_name,
                    uint32_t baud_rate,
                    uint8_t *dxl_id,
@@ -401,7 +401,6 @@ private:
       return result;
     }
 
-
 public:
     ServoPlayer(int velocity, int acceleration)
       : port_name("/dev/ttyUSB0"),
@@ -409,20 +408,22 @@ public:
         vel(velocity),
         acc(acceleration),
         model_number(1200),
-        current_goal_pos(2) {
-
-        dxl_id[0] = 0; dxl_id[1] = 1; dxl_id[2] = 2; dxl_id[3] = 3;
-        dxl_id[4] = 4; dxl_id[5] = 5; dxl_id[6] = 6;
-
-        positions1[0] = 100000; positions1[1] = -300000; positions1[2] = -210230;
-        positions1[3] = -102300; positions1[4] = 204800; positions1[5] = 120470; positions1[6] = 32047;
-
-        positions2[0] = -320470; positions2[1] = -120470; positions2[2] = -204800;
-        positions2[3] = 102300; positions2[4] = 210230; positions2[5] = 300000; positions2[6] = -10000;
+        handler_index(0),
+        current_goal_pos(0) {
 
         for (int i = 0; i < SERVOS; ++i) {
-            present_positions[i] = 0;
+            dxl_id[i] = i;
         }
+
+        // bulkReadPositions();
+
+        int32_t positions1[SERVOS] = {0, 0, 0, 0, 0, 0, 0};
+        int32_t positions2[SERVOS] = {   0,    0, 2048, 2048, 2048, 4095, 4095};
+        int32_t positions3[SERVOS] = {4095, 4095, -2048, -2048, -2048, 0, 0};
+
+        listOfGoalPositions.push_back(std::vector<int32_t>(positions1, positions1 + SERVOS));
+        listOfGoalPositions.push_back(std::vector<int32_t>(positions2, positions2 + SERVOS));
+        listOfGoalPositions.push_back(std::vector<int32_t>(positions3, positions3 + SERVOS));
 
         const char *log;
         if (!initializeWorkbench(dxl_wb, port_name, baud_rate, dxl_id, vel, acc)) {
@@ -431,20 +432,18 @@ public:
         }
     }
 
-    void updateGoalPositions() {
+    void run() {
       const char *log;
-      const uint8_t handler_index = 0;
       syncWritePosition(dxl_wb, handler_index, &goal_positions[0], &log);
-        bool reached = checkIfPositionsReached(goal_positions, present_positions, SERVOS);
-        if (reached) {
-            if (current_goal_pos == 1) {
-                std::copy(std::begin(positions2), std::end(positions2), std::begin(goal_positions));
-                current_goal_pos = 2;
-            } else if (current_goal_pos == 2) {
-                std::copy(std::begin(positions1), std::end(positions1), std::begin(goal_positions));
-                current_goal_pos = 1;
-            }
-        }
+    }
+
+    void nextMotionPattern() {
+        // Update currentGoalIndex and wrap around if necessary
+        current_goal_pos = (current_goal_pos + 1) % listOfGoalPositions.size();
+        // Update goal_positions
+        std::copy(listOfGoalPositions[current_goal_pos].begin(),
+          listOfGoalPositions[current_goal_pos].end(),
+          std::begin(goal_positions));
     }
 
     void bulkReadPositions() {
@@ -479,8 +478,6 @@ int main(int argc, char *argv[])
   ServoPlayer servoPlayer(vel, acc);
   AnimationPlayer *anim = new AnimationPlayer();
 
-  anim->play();
-
   //LEDS
   struct timeval start_time, current_time;
   gettimeofday(&start_time, NULL);
@@ -493,13 +490,14 @@ int main(int argc, char *argv[])
      if (elapsed_seconds - last_switch >= switch_interval) {
        last_switch = elapsed_seconds;
        anim->nextAnimation();
+       servoPlayer.nextMotionPattern();
      }
-     anim->play();
-
      auto servo_time = std::chrono::high_resolution_clock::now();
-     servoPlayer.updateGoalPositions();
+     anim->play();
+     servoPlayer.run();
+
      auto servo_write_time = std::chrono::high_resolution_clock::now();
-     servoPlayer.bulkReadPositions();
+     // servoPlayer.bulkReadPositions();
      auto servo_read_time = std::chrono::high_resolution_clock::now();
 
      // Calculate the duration for each operation
