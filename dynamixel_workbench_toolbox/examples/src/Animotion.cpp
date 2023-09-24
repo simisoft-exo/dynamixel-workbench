@@ -419,7 +419,7 @@ public:
 
         int32_t positions1[SERVOS] = {0, 0, 0, 0, 0, 0, 0};
         int32_t positions2[SERVOS] = {   0,    0, 2048, 2048, 2048, 4095, 4095};
-        int32_t positions3[SERVOS] = {4095, 4095, -2048, -2048, -2048, 0, 0};
+        int32_t positions3[SERVOS] = {4095, 4095, 0, -2048, -2048, 1024, 1024};
 
         listOfGoalPositions.push_back(std::vector<int32_t>(positions1, positions1 + SERVOS));
         listOfGoalPositions.push_back(std::vector<int32_t>(positions2, positions2 + SERVOS));
