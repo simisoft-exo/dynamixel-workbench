@@ -140,120 +140,6 @@ bool initializeLEDs()
   return true;
 }
 
-bool bulkReadPosition(DynamixelWorkbench &dxl_wb, int32_t *present_position, const char **log)
-{
-  bool result = dxl_wb.bulkRead(log);
-  if (result == false)
-  {
-    printf("%s\n", *log);
-    printf("Failed to bulk read\n");
-    return false;
-  }
-
-  result = dxl_wb.getBulkReadData(&present_position[0], log);
-  if (result == false)
-  {
-    printf("Failed to get bulk read data%s\n", *log);
-    return false;
-  }
-  return true;
-}
-
-bool syncWritePosition(DynamixelWorkbench &dxl_wb, uint8_t handler_index, int32_t *goal_position, const char **log)
-{
-  bool result = dxl_wb.syncWrite(handler_index, &goal_position[0], log);
-  if (result == false)
-  {
-    printf("%s\n", *log);
-    printf("Failed to sync write position\n");
-  }
-  return result;
-}
-
-bool initializeServos(DynamixelWorkbench &dxl_wb,
-                   const char *port_name,
-                   uint32_t baud_rate,
-                   uint8_t *dxl_id,
-                   int vel,
-                   int acc) {
-  const char *log;
-  bool result;
-  uint16_t model_number;
-
-  // Initialize dxl_wb
-  result = dxl_wb.init(port_name, baud_rate, &log);
-  if (!result) {
-    printf("%s\n", log);
-    printf("Failed to init\n");
-    return false;
-  }
-  printf("Succeed to init(%d)\n", baud_rate);
-
-  // Loop through servos
-  for (int cnt = 0; cnt < SERVOS; cnt++) {
-    result = dxl_wb.ping(dxl_id[cnt], &model_number, &log);
-    if (!result) {
-      printf("%s\n", log);
-      printf("Failed to ping\n");
-    } else {
-      printf("Succeeded to ping\n");
-      printf("id : %d, model_number : %d\n", dxl_id[cnt], model_number);
-    }
-
-    result = dxl_wb.multiJointMode(dxl_id[cnt], vel, acc, &log);
-    if (!result) {
-      printf("%s\n", log);
-      printf("Failed to change to multi joint mode\n");
-    } else {
-      printf("Succeed to change to multi joint mode\n");
-    }
-  }
-
-  result = dxl_wb.addSyncWriteHandler(dxl_id[0], "Goal_Position", &log);
-  if (!result) {
-    printf("%s\n", log);
-    printf("Failed to add sync write handler\n");
-  }
-
-  result = dxl_wb.initBulkRead(&log);
-  if (result == false)
-  {
-    printf("%s\n", log);
-  }
-  else
-  {
-    printf("Suceeded init bulk read: %s\n", log);
-  }
-
-  result = dxl_wb.addBulkReadParam(dxl_id[0], "Present_Position", &log);
-  if (result == false)
-  {
-    printf("%s\n", log);
-    printf("Failed to add bulk read position param\n");
-    return false;
-  }
-  else
-  {
-    printf("Succeeded bulk read for position: %s\n", log);
-  }
-  return result;
-}
-
-
-bool checkIfPositionsReached(const int32_t goal_position[], const int32_t present_position[], size_t size)
-{
-  bool reached = true;
-  for (size_t i = 0; i < size; ++i)
-  {
-    long delta = std::abs(goal_position[i] - present_position[i]);
-    if (delta > 30)
-    {
-      reached = false;
-    }
-  }
-  printf("\n");
-  return reached;
-}
 
 enum class TransitionState {
   NONE,
@@ -399,10 +285,131 @@ private:
     int32_t present_positions[SERVOS];
     int current_goal_pos;
 
+    bool bulkReadPosition(DynamixelWorkbench &dxl_wb, int32_t *present_position, const char **log)
+    {
+        bool result = dxl_wb.bulkRead(log);
+        if (result == false)
+        {
+          printf("%s\n", *log);
+          printf("Failed to bulk read\n");
+          return false;
+        }
+
+        result = dxl_wb.getBulkReadData(&present_position[0], log);
+        if (result == false)
+        {
+          printf("Failed to get bulk read data%s\n", *log);
+          return false;
+        }
+        return true;
+      }
+
+      bool syncWritePosition(DynamixelWorkbench &dxl_wb, uint8_t handler_index, int32_t *goal_position, const char **log)
+      {
+        bool result = dxl_wb.syncWrite(handler_index, &goal_position[0], log);
+        if (result == false)
+        {
+          printf("%s\n", *log);
+          printf("Failed to sync write position\n");
+        }
+        return result;
+      }
+      
+      bool checkIfPositionsReached(const int32_t goal_position[], const int32_t present_position[], size_t size)
+      {
+        bool reached = true;
+        for (size_t i = 0; i < size; ++i)
+        {
+          long delta = std::abs(goal_position[i] - present_position[i]);
+          printf("id: %d delta: %ld | ", i, delta);
+          if (delta > 30)
+          {
+            reached = false;
+          }
+        }
+        printf("\n");
+        return reached;
+      }
+
+      bool initializeWorkbench(DynamixelWorkbench &dxl_wb,
+                   const char *port_name,
+                   uint32_t baud_rate,
+                   uint8_t *dxl_id,
+                   int vel,
+                   int acc)
+    {
+      const char *log;
+      bool result;
+      uint16_t model_number;
+
+      // Initialize dxl_wb
+      result = dxl_wb.init(port_name, baud_rate, &log);
+      if (!result) {
+        printf("%s\n", log);
+        printf("Failed to init\n");
+        return false;
+      }
+      printf("Succeed to init(%d)\n", baud_rate);
+
+      // Loop through servos
+      for (int cnt = 0; cnt < SERVOS; cnt++) {
+        result = dxl_wb.ping(dxl_id[cnt], &model_number, &log);
+        if (!result) {
+          printf("%s\n", log);
+          printf("Failed to ping\n");
+        } else {
+          printf("Succeeded to ping\n");
+          printf("id : %d, model_number : %d\n", dxl_id[cnt], model_number);
+        }
+
+        result = dxl_wb.multiJointMode(dxl_id[cnt], vel, acc, &log);
+        if (!result) {
+          printf("%s\n", log);
+          printf("Failed to change to multi joint mode\n");
+        } else {
+          printf("Succeed to change to multi joint mode\n");
+        }
+      }
+
+      result = dxl_wb.addSyncWriteHandler(dxl_id[0], "Goal_Position", &log);
+      if (!result) {
+        printf("%s\n", log);
+        printf("Failed to add sync write handler\n");
+      }
+
+      result = dxl_wb.initBulkRead(&log);
+      if (result == false)
+      {
+        printf("%s\n", log);
+      }
+      else
+      {
+        printf("Suceeded init bulk read: %s\n", log);
+      }
+
+      result = dxl_wb.addBulkReadParam(dxl_id[0], "Present_Position", &log);
+      if (result == false)
+      {
+        printf("%s\n", log);
+        printf("Failed to add bulk read position param\n");
+        return false;
+      }
+      else
+      {
+        printf("Succeeded bulk read for position: %s\n", log);
+      }
+      return result;
+    }
+
+
 public:
     ServoPlayer(int velocity, int acceleration)
-      : port_name("/dev/ttyUSB0"), baud_rate(3000000),
-        vel(velocity), acc(acceleration), model_number(1200), current_goal_pos(2) {
+      : port_name("/dev/ttyUSB0"),
+        baud_rate(3000000),
+        vel(velocity),
+        acc(acceleration),
+        model_number(1200),
+        current_goal_pos(2) {
 
         dxl_id[0] = 0; dxl_id[1] = 1; dxl_id[2] = 2; dxl_id[3] = 3;
         dxl_id[4] = 4; dxl_id[5] = 5; dxl_id[6] = 6;
@@ -418,15 +425,10 @@ public:
         }
 
         const char *log;
-        if (!initializeServos()) {
+        if (!initializeWorkbench(dxl_wb, port_name, baud_rate, dxl_id, vel, acc)) {
             printf("Failed to initialized some or all settings");
             exit(0);  // Exit if the initialization failed
         }
-    }
-
-    bool initializeServos() {
-        const char *log;
-        return ::initializeServos(dxl_wb, port_name, baud_rate, dxl_id, vel, acc);
     }
 
     void updateGoalPositions() {
