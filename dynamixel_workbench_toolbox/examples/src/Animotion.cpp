@@ -242,15 +242,17 @@ bool initializeServos(DynamixelWorkbench &dxl_wb,
 
 bool checkIfPositionsReached(const int32_t goal_position[], const int32_t present_position[], size_t size)
 {
+  bool reached = true;
   for (size_t i = 0; i < size; ++i)
   {
     long delta = std::abs(goal_position[i] - present_position[i]);
-    if (std::abs(goal_position[i] - present_position[i]) > 15)
+    if (delta > 30)
     {
-      return false;
+      reached = false;
     }
   }
-  return true;
+  printf("\n");
+  return reached;
 }
 
 enum class TransitionState {
@@ -272,6 +274,7 @@ class AnimationPlayer {
     // Constructor
     AnimationPlayer() {
 
+    initializeLEDs();
         // Create all the animations
     AnimationContext rotating_frames = {
       .frames = NULL,
@@ -307,7 +310,7 @@ class AnimationPlayer {
         // Switch to the next animation
         next_animation = &animations[animation_sequence[current_animation_index]];
         if (transition_animation == nullptr) {
-            transition_animation = new AnimationContext;  // or however you create a new AnimationContext
+            transition_animation = new AnimationContext;
             transition_animation->frames = NULL;
             transition_animation->frame_count = 0;
             transition_animation->current_frame = 0;
@@ -319,7 +322,6 @@ class AnimationPlayer {
             }
           }
           free(transition_animation->frames);  // Use free() since realloc was used for allocation
-          transition_animation = nullptr;
           transition_animation = new AnimationContext;  // or however you create a new AnimationContext
           transition_animation->frames = NULL;
           transition_animation->frame_count = 0;
@@ -362,7 +364,7 @@ class AnimationPlayer {
 int main(int argc, char *argv[])
 {
   const char* port_name = "/dev/ttyUSB0";
-  int baud_rate = 115200;
+  int baud_rate = 3000000;
 
   int vel = 10;
   int acc = 2;
@@ -392,17 +394,16 @@ int main(int argc, char *argv[])
     return 0;  // Exit if the initialization failed
   }
 
-  initializeLEDs();
 
   const uint8_t handler_index = 0;
   // SERVOS
-  int32_t positions1[SERVOS] = {1000, -30000, -21023, -10230, 20480, 12047, 32047};
-  int32_t positions2[SERVOS] = {-32047, -12047, -20480, 10230, 21023, 30000, -1000};
+  int32_t positions1[SERVOS] = {100000, -300000, -210230, -102300, 204800, 120470, 32047};
+  int32_t positions2[SERVOS] = {-320470, -120470, -204800, 102300, 210230, 300000, -10000};
 
   int32_t goal_positions[SERVOS];
-  std::copy(std::begin(positions1), std::end(positions1), std::begin(goal_positions));
+  std::copy(std::begin(positions1), std::end(positions2), std::begin(goal_positions));
 
-  int current_goal_pos = 1;
+  int current_goal_pos = 2;
   syncWritePosition(dxl_wb, handler_index, &goal_positions[0], &log);
 
   anim->play();
@@ -418,27 +419,26 @@ int main(int argc, char *argv[])
 
   while(running)
   {
-        gettimeofday(&current_time, NULL);
-        elapsed_seconds = current_time.tv_sec - start_time.tv_sec;
-
-        // Check if 5 seconds have passed
-        if (elapsed_seconds - last_switch >= switch_interval) {
-          last_switch = elapsed_seconds;
-          anim->nextAnimation();
-        }
-        anim->play();
+     gettimeofday(&current_time, NULL);
+     elapsed_seconds = current_time.tv_sec - start_time.tv_sec;
+     // Check if 5 seconds have passed
+     if (elapsed_seconds - last_switch >= switch_interval) {
+       last_switch = elapsed_seconds;
+       anim->nextAnimation();
+     }
+     anim->play();
 
      auto servo_time = std::chrono::high_resolution_clock::now();
 
-
-     if (checkIfPositionsReached(goal_positions, present_position, SERVOS))
+     bool reached = checkIfPositionsReached(goal_positions, present_position, SERVOS);
+     if (reached)
      {
        if (current_goal_pos = 1){
-         std::copy(std::begin(positions1), std::end(positions1), std::begin(goal_positions));
+         std::copy(std::begin(positions2), std::end(positions2), std::begin(goal_positions));
          current_goal_pos = 2;
        }
        if (current_goal_pos = 2){
-         std::copy(std::begin(positions2), std::end(positions2), std::begin(goal_positions));
+         std::copy(std::begin(positions1), std::end(positions1), std::begin(goal_positions));
          current_goal_pos = 1;
        }
        syncWritePosition(dxl_wb, handler_index, &goal_positions[0], &log);
@@ -455,15 +455,15 @@ int main(int argc, char *argv[])
      auto read_duration = std::chrono::duration_cast<std::chrono::microseconds>(servo_read_time - servo_write_time);
 
      // Print the durations
-     // printf("syncWrite took %lld microseconds\n", write_duration.count());
-     // printf("syncRead took %lld microseconds\n", read_duration.count());
+     printf("syncWrite took %lld microseconds\n", write_duration.count());
+     printf("syncRead took %lld microseconds\n", read_duration.count());
 
      // Calculate remaining time for usleep
      auto total_duration = write_duration + read_duration;
      auto remaining_time = std::chrono::microseconds(FRAME_DURATION) - total_duration;
 
-     // printf("total took %lld microseconds\n", total_duration.count());
-     // printf("sleep for: %lld microseconds\n", remaining_time.count());
+     printf("total took %lld microseconds\n", total_duration.count());
+     printf("sleep for: %lld microseconds\n", remaining_time.count());
 
      if (remaining_time.count() > 0)
      {
