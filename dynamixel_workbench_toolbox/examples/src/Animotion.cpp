@@ -285,6 +285,7 @@ class AnimationPlayer {
 
     make_rotating_frames(&rotating_frames,num_frames);
     animations[AnimationType::ROTATING_FRAMES] = rotating_frames;
+    animation_sequence.push_back(AnimationType::ROTATING_FRAMES);
 
     AnimationContext growing_ellipse_frames = {
       .frames = NULL,
@@ -295,9 +296,31 @@ class AnimationPlayer {
 
     make_growing_ellipse(&growing_ellipse_frames,num_frames);
     animations[AnimationType::GROWING_ELLIPSE] = growing_ellipse_frames;
-
-    animation_sequence.push_back(AnimationType::ROTATING_FRAMES);
     animation_sequence.push_back(AnimationType::GROWING_ELLIPSE);
+
+    AnimationContext surface_spectrum_frames = {
+      .frames = NULL,
+      .frame_count = 0,
+      .current_frame = 0,
+      .direction = 1
+    };
+
+    make_color_spectrum(&surface_spectrum_frames, 10*num_frames);
+    animations[AnimationType::SURFACE_SPECTRUM] = surface_spectrum_frames;
+    animation_sequence.push_back(AnimationType::SURFACE_SPECTRUM);
+
+
+    AnimationContext side_wave_frames = {
+      .frames = NULL,
+      .frame_count = 0,
+      .current_frame = 0,
+      .direction = 1
+    };
+
+    // make_side_waves(&side_wave_frames,num_frames);
+    // animations[AnimationType::SIDE_WAVE] = side_wave_frames;
+
+    // animation_sequence.push_back(AnimationType::SIDE_WAVE);
 
         // Initialize current and next animations
     current_animation = &animations[animation_sequence[current_animation_index]];
