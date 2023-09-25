@@ -164,6 +164,26 @@ class AnimationPlayer {
 
     initializeLEDs();
         // Create all the animations
+
+    AnimationContext random_color_sequence_frames = {
+        .frames = NULL,
+        .frame_count = 0,
+        .max_frames = 1000,
+        .current_frame = 0,
+        .direction = 1
+    };
+
+    // 2. Use the make_random_color_sequence function to fill the AnimationContext with frames
+    int desired_num_frames = 10;  // Or any other desired number
+    make_random_color_sequence(&random_color_sequence_frames, desired_num_frames, 2*FPS);
+
+    // 3. Add this animation to your collection of animations
+    animations[AnimationType::RANDOM] = random_color_sequence_frames;
+
+    // 4. (Optional) Add this animation type to any sequence or list
+    animation_sequence.push_back(AnimationType::RANDOM);
+
+
     AnimationContext rotating_frames = {
       .frames = NULL,
       .frame_count = 0,
@@ -171,7 +191,7 @@ class AnimationPlayer {
       .direction = 1
     };
 
-    make_rotating_frames(&rotating_frames,num_frames);
+    make_rotating_frames(&rotating_frames,100*num_frames);
     animations[AnimationType::ROTATING_FRAMES] = rotating_frames;
     animation_sequence.push_back(AnimationType::ROTATING_FRAMES);
 
@@ -197,18 +217,6 @@ class AnimationPlayer {
     animations[AnimationType::SURFACE_SPECTRUM] = surface_spectrum_frames;
     animation_sequence.push_back(AnimationType::SURFACE_SPECTRUM);
 
-
-    AnimationContext side_wave_frames = {
-      .frames = NULL,
-      .frame_count = 0,
-      .current_frame = 0,
-      .direction = 1
-    };
-
-    // make_side_waves(&side_wave_frames,num_frames);
-    // animations[AnimationType::SIDE_WAVE] = side_wave_frames;
-
-    // animation_sequence.push_back(AnimationType::SIDE_WAVE);
 
         // Initialize current and next animations
     current_animation = &animations[animation_sequence[current_animation_index]];
@@ -240,7 +248,7 @@ class AnimationPlayer {
           transition_animation->direction = 1;
         }
 
-        smooth_interpolate_to_new_frames(current_animation, next_animation, transition_animation, 2*FPS);
+        smooth_interpolate_to_new_frames(current_animation, next_animation, transition_animation, 10*FPS);
         current_animation = next_animation;
         transition_state = TransitionState::TRANSITIONING;
     }
