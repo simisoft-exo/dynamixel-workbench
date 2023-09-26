@@ -66,7 +66,7 @@ int clear_on_exit = 0;
 
 long elapsed_seconds = 0;
 long last_switch = 0;
-int switch_interval = 20;  // Switch every 5 seconds
+int switch_interval = 15;  // Switch every 5 seconds
 
 ws2811_t ledstring =
 {
@@ -168,21 +168,19 @@ class AnimationPlayer {
     AnimationContext random_color_sequence_frames = {
         .frames = NULL,
         .frame_count = 0,
-        .max_frames = 1000,
         .current_frame = 0,
         .direction = 1
     };
 
     // 2. Use the make_random_color_sequence function to fill the AnimationContext with frames
-    int desired_num_frames = 10;  // Or any other desired number
-    make_random_color_sequence(&random_color_sequence_frames, desired_num_frames, 2*FPS);
+    int desired_num_frames = 20;  // Or any other desired number
+    make_random_color_sequence(&random_color_sequence_frames, desired_num_frames, 5*FPS);
 
     // 3. Add this animation to your collection of animations
     animations[AnimationType::RANDOM] = random_color_sequence_frames;
 
     // 4. (Optional) Add this animation type to any sequence or list
     animation_sequence.push_back(AnimationType::RANDOM);
-
 
     AnimationContext rotating_frames = {
       .frames = NULL,
@@ -191,7 +189,7 @@ class AnimationPlayer {
       .direction = 1
     };
 
-    make_rotating_frames(&rotating_frames,100*num_frames);
+    make_rotating_frames(&rotating_frames, 25*num_frames);
     animations[AnimationType::ROTATING_FRAMES] = rotating_frames;
     animation_sequence.push_back(AnimationType::ROTATING_FRAMES);
 
@@ -213,7 +211,7 @@ class AnimationPlayer {
       .direction = 1
     };
 
-    make_color_spectrum(&surface_spectrum_frames, 10*num_frames);
+    make_color_spectrum(&surface_spectrum_frames, 8*num_frames);
     animations[AnimationType::SURFACE_SPECTRUM] = surface_spectrum_frames;
     animation_sequence.push_back(AnimationType::SURFACE_SPECTRUM);
 
@@ -268,12 +266,14 @@ class AnimationPlayer {
       else
       {
         // Send current animation
+        printf("playing frame: %d", current_animation->current_frame);
         send_frame_to_neopixels(current_animation->frames[current_animation->current_frame], &ledstring);
 
         current_animation->current_frame += current_animation->direction;
         /* printf("moved to frame: %d", current_animation.current_frame); */
         if (current_animation->current_frame >= current_animation->frame_count - 1 || current_animation->current_frame <= 0) {
           current_animation->direction *= -1;  // Reverse direction
+          printf("switching direction");
         }
       }
 
