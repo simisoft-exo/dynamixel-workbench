@@ -141,9 +141,20 @@ bool initializeLEDs()
 }
 
 
-enum class TransitionState {
+enum class PlayState {
   NONE,
+  PLAYING,
   TRANSITIONING
+};
+
+AnimationContext init_animation_context() {
+    AnimationContext ctx = {
+        .frames = NULL,
+        .frame_count = 0,
+        .current_frame = 0,
+        .direction = 1
+    };
+    return ctx;
 };
 
 class AnimationPlayer {
@@ -157,7 +168,7 @@ class AnimationPlayer {
     AnimationContext *current_animation;
     AnimationContext *next_animation;
     AnimationContext *transition_animation = nullptr;
-    TransitionState transition_state = TransitionState::NONE;
+    PlayState transition_state = PlayState::NONE;
   public:
     // Constructor
     AnimationPlayer() {
@@ -165,58 +176,32 @@ class AnimationPlayer {
     initializeLEDs();
         // Create all the animations
 
-    AnimationContext random_color_sequence_frames = {
-        .frames = NULL,
-        .frame_count = 0,
-        .current_frame = 0,
-        .direction = 1
-    };
-
-    // 2. Use the make_random_color_sequence function to fill the AnimationContext with frames
+    // Initialize and create random color sequence frames
+    AnimationContext random_color_sequence_frames = init_animation_context();
     int desired_num_frames = 20;  // Or any other desired number
     make_random_color_sequence(&random_color_sequence_frames, desired_num_frames, 5*FPS);
-
-    // 3. Add this animation to your collection of animations
     animations[AnimationType::RANDOM] = random_color_sequence_frames;
-
-    // 4. (Optional) Add this animation type to any sequence or list
     animation_sequence.push_back(AnimationType::RANDOM);
 
-    AnimationContext rotating_frames = {
-      .frames = NULL,
-      .frame_count = 0,
-      .current_frame = 0,
-      .direction = 1
-    };
-
+    // Initialize and create rotating frames
+    AnimationContext rotating_frames = init_animation_context();
     make_rotating_frames(&rotating_frames, 25*num_frames);
     animations[AnimationType::ROTATING_FRAMES] = rotating_frames;
     animation_sequence.push_back(AnimationType::ROTATING_FRAMES);
 
-    AnimationContext growing_ellipse_frames = {
-      .frames = NULL,
-      .frame_count = 0,
-      .current_frame = 0,
-      .direction = 1
-    };
-
+    // Initialize and create growing ellipse frames
+    AnimationContext growing_ellipse_frames = init_animation_context();
     make_growing_ellipse(&growing_ellipse_frames,num_frames);
     animations[AnimationType::GROWING_ELLIPSE] = growing_ellipse_frames;
     animation_sequence.push_back(AnimationType::GROWING_ELLIPSE);
 
-    AnimationContext surface_spectrum_frames = {
-      .frames = NULL,
-      .frame_count = 0,
-      .current_frame = 0,
-      .direction = 1
-    };
-
+    // Initialize for surface spectrum frames
+    AnimationContext surface_spectrum_frames = init_animation_context();
     make_color_spectrum(&surface_spectrum_frames, 8*num_frames);
     animations[AnimationType::SURFACE_SPECTRUM] = surface_spectrum_frames;
     animation_sequence.push_back(AnimationType::SURFACE_SPECTRUM);
 
-
-        // Initialize current and next animations
+    // Initialize current and next animations
     current_animation = &animations[animation_sequence[current_animation_index]];
     }
 
@@ -248,17 +233,17 @@ class AnimationPlayer {
 
         smooth_interpolate_to_new_frames(current_animation, next_animation, transition_animation, 10*FPS);
         current_animation = next_animation;
-        transition_state = TransitionState::TRANSITIONING;
+        transition_state = PlayState::TRANSITIONING;
     }
 
     void play () {
-      if (transition_state == TransitionState::TRANSITIONING){
+      if (transition_state == PlayState::TRANSITIONING){
 
         int frame_no = transition_animation->current_frame;
 
         transition_animation->current_frame++;
         if (transition_animation->current_frame >= transition_animation->frame_count - 1) {
-          transition_state = TransitionState::NONE;
+          transition_state = PlayState::NONE;
         } else {
           send_frame_to_neopixels(transition_animation->frames[transition_animation->current_frame], &ledstring);
         }
@@ -266,14 +251,12 @@ class AnimationPlayer {
       else
       {
         // Send current animation
-        printf("playing frame: %d", current_animation->current_frame);
         send_frame_to_neopixels(current_animation->frames[current_animation->current_frame], &ledstring);
 
         current_animation->current_frame += current_animation->direction;
         /* printf("moved to frame: %d", current_animation.current_frame); */
         if (current_animation->current_frame >= current_animation->frame_count - 1 || current_animation->current_frame <= 0) {
           current_animation->direction *= -1;  // Reverse direction
-          printf("switching direction");
         }
       }
 
