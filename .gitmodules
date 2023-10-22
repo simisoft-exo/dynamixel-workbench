@@ -1,0 +1,9 @@
+[submodule "rpi_ws281x"]
+	path = rpi_ws281x
+	url = git@github.com:simisoft-exo/rpi_ws281x.git
+[submodule "dynamixel_workbench_toolbox/examples/build/sdbus-cpp"]
+	path = dynamixel_workbench_toolbox/examples/build/sdbus-cpp
+	url = git@github.com:Kistler-Group/sdbus-cpp.git
+[submodule "sdbus-cpp"]
+	path = sdbus-cpp
+	url = git@github.com:Kistler-Group/sdbus-cpp.git
