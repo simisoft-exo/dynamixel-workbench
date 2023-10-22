@@ -60,7 +60,7 @@ int clear_on_exit = 0;
 #define STRIP_TYPE              SK6812_STRIP_GRBW		// SK6812RGBW (NOT SK6812RGB)
 
 #define LED_COUNT               (LUT_W * LUT_H)
-#define FPS                     25
+#define FPS                     50
 #define FRAME_DURATION          (1000000/FPS)
 
 
@@ -306,7 +306,7 @@ private:
           printf("Failed to sync write position\n");
         }
         return result;
-      }
+    }
       
     bool checkIfPositionsReached()
     {

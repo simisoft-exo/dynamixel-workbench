@@ -1,14 +1,18 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(dynamixel_workbench)
 
-add_compile_options(-std=c++14)
+add_compile_options(-std=c++17)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include_directories(
   ../src
   ../../rpi_ws281x
+  ../../sdbus-cpp
 )
 
 add_subdirectory(../../rpi_ws281x rpi_ws281x_build)
+add_subdirectory(../../sdbus-cpp ../../sdbus-cpp/build)
 
 add_library(
   dynamixel_workbench
@@ -18,6 +22,7 @@ add_library(
   ../src/dynamixel_workbench_toolbox/dynamixel_workbench.cpp
 )
 
+link_directories(../../sdbus-cpp/build)
 
 if(APPLE)
   target_link_libraries(dynamixel_workbench LINK_PUBLIC "/usr/local/lib/libdxl_mac_cpp.dylib")
@@ -26,6 +31,7 @@ else()
 endif()
 
 target_link_libraries(dynamixel_workbench LINK_PUBLIC ws2811)  # link ws2811 to it
+target_link_libraries(dynamixel_workbench LINK_PUBLIC sdbus-c++)  # link sdbus-cpp to it
 
 add_executable(model_scan src/a_Model_Scan.cpp)
 target_link_libraries(model_scan LINK_PUBLIC dynamixel_workbench)
@@ -77,3 +83,6 @@ target_link_libraries(monitor LINK_PUBLIC dynamixel_workbench)
 
 add_executable(animotion src/Animotion.cpp)
 target_link_libraries(animotion LINK_PUBLIC dynamixel_workbench)
+
+add_executable(bt src/BT.cpp)
+target_link_libraries(bt LINK_PUBLIC dynamixel_workbench bluetooth sdbus-c++)
