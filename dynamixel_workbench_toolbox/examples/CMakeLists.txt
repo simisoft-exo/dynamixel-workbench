@@ -11,6 +11,10 @@ include_directories(
   ../../sdbus-cpp
 )
 
+link_directories(/usr/lib/arm-linux-gnueabihf)
+include_directories(/usr/include/tinyxml2)
+
+
 add_subdirectory(../../rpi_ws281x rpi_ws281x_build)
 add_subdirectory(../../sdbus-cpp ../../sdbus-cpp/build)
 
@@ -32,6 +36,7 @@ endif()
 
 target_link_libraries(dynamixel_workbench LINK_PUBLIC ws2811)  # link ws2811 to it
 target_link_libraries(dynamixel_workbench LINK_PUBLIC sdbus-c++)  # link sdbus-cpp to it
+target_link_libraries(dynamixel_workbench LINK_PUBLIC "/usr/lib/arm-linux-gnueabihf/libtinyxml2.so")  # link sdbus-cpp to it
 
 add_executable(model_scan src/a_Model_Scan.cpp)
 target_link_libraries(model_scan LINK_PUBLIC dynamixel_workbench)
@@ -85,4 +90,4 @@ add_executable(animotion src/Animotion.cpp)
 target_link_libraries(animotion LINK_PUBLIC dynamixel_workbench)
 
 add_executable(bt src/BT.cpp)
-target_link_libraries(bt LINK_PUBLIC dynamixel_workbench bluetooth sdbus-c++)
+target_link_libraries(bt LINK_PUBLIC dynamixel_workbench bluetooth sdbus-c++ tinyxml2)
