@@ -1,0 +1,16 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/ubuntu/wavelamp/dynamixel-workbench/sdbus-cpp/src/VTableUtils.c
+VTableUtils.h
+/home/ubuntu/wavelamp/dynamixel-workbench/sdbus-cpp/src/VTableUtils.h
+
+/home/ubuntu/wavelamp/dynamixel-workbench/sdbus-cpp/src/VTableUtils.h
+stdbool.h
+-
+
